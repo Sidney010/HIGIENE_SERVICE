@@ -1,0 +1,41 @@
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    participant App as App/Recepcao
+    participant API as API
+    participant AG as ServicoAgenda
+    participant FIN as Financeiro
+    participant DB as Banco de Dados
+    participant EV as Eventos
+    participant NT as Notificacao
+    actor E as Cliente em espera
+
+    C->>App: Solicita cancelamento
+    App->>API: POST /agendamentos/{id}/cancelar
+    API->>AG: cancelar(id, motivo)
+    AG->>DB: Busca agendamento
+    AG->>AG: Valida transicao de status
+    AG->>AG: Verifica prazo minimo de cancelamento
+    alt Dentro do prazo
+        AG->>DB: UPDATE status = CANCELADO
+    else Fora do prazo
+        AG->>FIN: Aplicar multa ou reter sinal
+        FIN->>DB: Registra cobranca
+        AG->>DB: UPDATE status = CANCELADO
+    end
+    AG->>EV: Publica AgendamentoCancelado
+    API-->>App: 200 OK
+    App-->>C: Cancelamento confirmado
+    EV->>AG: Libera horario na agenda
+    EV->>DB: Busca lista de espera compativel
+    DB-->>EV: Cliente em espera
+    EV->>NT: Avisa vaga disponivel
+    NT-->>E: Notificacao com link para reservar
+    opt Cliente quer remarcar
+        C->>App: Escolhe novo horario
+        App->>API: POST /agendamentos/{id}/remarcar
+        API->>AG: remarcar(id, novoInicio)
+        AG->>AG: Revalida disponibilidade e conflitos
+        AG->>DB: Marca antigo REMARCADO e cria novo
+        AG->>EV: Publica AgendamentoRemarcado
+    end

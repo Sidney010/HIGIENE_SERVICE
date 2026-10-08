@@ -1,0 +1,49 @@
+sequenceDiagram
+    autonumber
+    actor P as Profissional
+    actor R as Recepcao
+    actor C as Cliente
+    participant API as API
+    participant AG as ServicoAgenda
+    participant CM as Comanda
+    participant FIN as Financeiro
+    participant ES as Estoque
+    participant DB as Banco de Dados
+    participant EV as Eventos
+
+    C->>R: Chega ao estabelecimento
+    R->>API: POST /agendamentos/{id}/check-in
+    API->>AG: confirmarPresenca()
+    AG->>DB: status = CONFIRMADO
+    P->>API: POST /agendamentos/{id}/iniciar
+    API->>AG: iniciarAtendimento()
+    AG->>DB: status = EM_ATENDIMENTO
+    API->>CM: abrirComanda(agendamento)
+    CM->>DB: INSERT comanda com itens congelados
+    opt Produtos consumidos ou vendidos
+        P->>API: POST /comandas/{id}/produtos
+        API->>CM: adicionarProduto()
+        CM->>ES: baixarEstoque()
+        ES->>DB: INSERT movimento de estoque
+    end
+    P->>API: POST /agendamentos/{id}/concluir
+    API->>AG: concluir()
+    AG->>DB: status = CONCLUIDO
+    R->>API: POST /comandas/{id}/pagamentos
+    API->>FIN: registrarPagamento(forma, valor)
+    FIN->>FIN: Valida caixa aberto
+    alt Desconto aplicado
+        FIN->>FIN: Exige permissao e motivo
+    end
+    FIN->>DB: INSERT pagamento
+    alt Pagamento integral confirmado
+        FIN->>DB: comanda = PAGA
+        FIN->>EV: Publica PagamentoConfirmado
+        EV->>FIN: calcularComissao()
+        FIN->>DB: INSERT comissao do profissional
+        EV->>EV: Dispara pedido de avaliacao
+    else Pagamento parcial
+        FIN-->>API: Saldo restante
+    end
+    API-->>R: Recibo
+    R-->>C: Entrega comprovante

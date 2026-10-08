@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    participant App as App/Site/WhatsApp
+    participant API as API
+    participant AG as ServicoAgenda
+    participant DB as Banco de Dados
+    participant EV as Eventos
+    participant NT as Notificacao
+
+    C->>App: Escolhe servicos e profissional
+    App->>API: GET /disponibilidade (servicos, profissional, data)
+    API->>AG: calcularHorariosLivres()
+    AG->>DB: Busca disponibilidade, bloqueios e agendamentos
+    DB-->>AG: Dados
+    AG-->>API: Lista de horarios livres
+    API-->>App: Horarios disponiveis
+    App-->>C: Exibe horarios
+    C->>App: Seleciona horario e confirma
+    App->>API: POST /agendamentos
+    API->>AG: criarAgendamento()
+    AG->>DB: BEGIN TRANSACTION (lock do horario)
+    AG->>AG: Valida habilitacao, antecedencia, disponibilidade
+    AG->>AG: Soma duracao e congela precos
+    alt Horario ocupado ou regra violada
+        AG->>DB: ROLLBACK
+        AG-->>API: Erro (horario indisponivel)
+        API-->>App: 409 Conflito
+        App-->>C: Sugere outros horarios
+    else Valido
+        AG->>DB: INSERT agendamento e itens (status PENDENTE)
+        AG->>DB: COMMIT
+        AG->>EV: Publica AgendamentoCriado
+        AG-->>API: Agendamento criado
+        API-->>App: 201 Criado
+        App-->>C: Confirmacao na tela
+        EV->>NT: Envia confirmacao (WhatsApp/SMS/e-mail)
+        NT-->>C: Mensagem de confirmacao
+    end

@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Agenda.Domain/Agenda.Domain.csproj" />
+    <Project Path="src/Agenda.Application/Agenda.Application.csproj" />
+    <Project Path="src/Agenda.Infrastructure/Agenda.Infrastructure.csproj" />
+    <Project Path="src/Agenda.Api/Agenda.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Agenda.Domain.Tests/Agenda.Domain.Tests.csproj" />
+    <Project Path="tests/Agenda.Integration.Tests/Agenda.Integration.Tests.csproj" />
+    <Project Path="tests/Agenda.Api.Tests/Agenda.Api.Tests.csproj" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/openapi.yaml" />
+    <File Path="docs/arquitetura.md" />
+  </Folder>
+</Solution>

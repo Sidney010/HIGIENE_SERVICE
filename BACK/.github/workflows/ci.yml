@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Vulnerabilidades em dependências
+        run: dotnet list package --vulnerable --include-transitive
+
+      # Unitários e de API: rápidos, a cada commit.
+      - name: Testes unitários e de API
+        run: >
+          dotnet test --no-build -c Release
+          --filter "FullyQualifiedName~Domain.Tests|FullyQualifiedName~Api.Tests"
+          --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      # Integração: usa Docker (Testcontainers) com PostgreSQL real. O ubuntu-latest já traz Docker.
+      - name: Testes de integração (PostgreSQL real)
+        run: dotnet test --no-build -c Release --filter "FullyQualifiedName~Integration.Tests"
+
+      - name: Contrato OpenAPI em dia
+        run: |
+          python3 -m pip install pyyaml
+          python3 tools/gen_contract.py
+          git diff --exit-code docs/openapi.yaml src/Agenda.Api/Controllers/Generated

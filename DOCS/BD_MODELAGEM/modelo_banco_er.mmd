@@ -1,0 +1,227 @@
+erDiagram
+    ESTABELECIMENTO ||--o{ UNIDADE : possui
+    ESTABELECIMENTO ||--o{ USUARIO : tem
+    ESTABELECIMENTO ||--o{ CLIENTE : atende
+    ESTABELECIMENTO ||--o{ SERVICO : oferece
+    ESTABELECIMENTO ||--o{ PRODUTO : vende
+    UNIDADE ||--o{ PROFISSIONAL : emprega
+    UNIDADE ||--o{ RECURSO : possui
+    UNIDADE ||--o{ CAIXA : opera
+    UNIDADE ||--o{ AGENDAMENTO : sedia
+    ESPECIALIDADE ||--o{ SERVICO : classifica
+    ESPECIALIDADE ||--o{ PROFISSIONAL_ESPECIALIDADE : ""
+    PROFISSIONAL ||--o{ PROFISSIONAL_ESPECIALIDADE : ""
+    PROFISSIONAL ||--o{ PROFISSIONAL_SERVICO : habilitado
+    SERVICO ||--o{ PROFISSIONAL_SERVICO : executado
+    PROFISSIONAL ||--o{ DISPONIBILIDADE : trabalha
+    PROFISSIONAL ||--o{ BLOQUEIO : possui
+    USUARIO |o--o| PROFISSIONAL : e
+    USUARIO |o--o| CLIENTE : e
+    CLIENTE ||--o{ AGENDAMENTO : realiza
+    PROFISSIONAL ||--o{ AGENDAMENTO : atende
+    RECURSO |o--o{ AGENDAMENTO : usado
+    AGENDAMENTO ||--|{ ITEM_AGENDAMENTO : contem
+    SERVICO ||--o{ ITEM_AGENDAMENTO : referenciado
+    CLIENTE ||--o{ LISTA_ESPERA : aguarda
+    SERVICO ||--o{ LISTA_ESPERA : deseja
+    AGENDAMENTO |o--o| COMANDA : gera
+    CAIXA |o--o{ COMANDA : registra
+    COMANDA ||--o{ PAGAMENTO : recebe
+    COMANDA ||--o{ COMISSAO : origina
+    PROFISSIONAL ||--o{ COMISSAO : recebe
+    PRODUTO ||--o{ MOVIMENTO_ESTOQUE : movimenta
+    COMANDA |o--o{ MOVIMENTO_ESTOQUE : consome
+    AGENDAMENTO ||--o{ NOTIFICACAO : dispara
+    AGENDAMENTO |o--o| AVALIACAO : recebe
+    USUARIO ||--o{ AUDITORIA : gera
+
+    ESTABELECIMENTO {
+        int id PK
+        string razao_social
+        string cnpj
+        string plano
+        boolean ativo
+    }
+    UNIDADE {
+        int id PK
+        int estabelecimento_id FK
+        string nome
+        string endereco
+        string telefone
+        time abre_as
+        time fecha_as
+        string fuso_horario
+    }
+    USUARIO {
+        int id PK
+        int estabelecimento_id FK
+        string email
+        string senha_hash
+        string perfil
+        boolean ativo
+    }
+    CLIENTE {
+        int id PK
+        int estabelecimento_id FK
+        int usuario_id FK
+        string nome
+        string telefone
+        string email
+        date data_nascimento
+        string observacoes
+        boolean consentimento_lgpd
+        int total_no_shows
+        datetime deletado_em
+    }
+    ESPECIALIDADE {
+        int id PK
+        string nome
+    }
+    PROFISSIONAL {
+        int id PK
+        int unidade_id FK
+        int usuario_id FK
+        string nome
+        decimal comissao_padrao
+        boolean ativo
+    }
+    PROFISSIONAL_ESPECIALIDADE {
+        int profissional_id PK
+        int especialidade_id PK
+    }
+    SERVICO {
+        int id PK
+        int estabelecimento_id FK
+        int especialidade_id FK
+        string nome
+        int duracao_min
+        decimal preco
+        boolean ativo
+    }
+    PROFISSIONAL_SERVICO {
+        int profissional_id PK
+        int servico_id PK
+        decimal preco_personalizado
+        int duracao_personalizada
+        decimal comissao
+    }
+    RECURSO {
+        int id PK
+        int unidade_id FK
+        string nome
+        string tipo
+    }
+    DISPONIBILIDADE {
+        int id PK
+        int profissional_id FK
+        int dia_semana
+        time inicio
+        time fim
+    }
+    BLOQUEIO {
+        int id PK
+        int profissional_id FK
+        datetime inicio
+        datetime fim
+        string motivo
+    }
+    AGENDAMENTO {
+        int id PK
+        int unidade_id FK
+        int cliente_id FK
+        int profissional_id FK
+        int recurso_id FK
+        datetime inicio
+        datetime fim
+        string status
+        string origem
+        decimal valor_total
+        string motivo_cancelamento
+        datetime criado_em
+    }
+    ITEM_AGENDAMENTO {
+        int id PK
+        int agendamento_id FK
+        int servico_id FK
+        decimal preco_congelado
+        int duracao_min
+    }
+    LISTA_ESPERA {
+        int id PK
+        int cliente_id FK
+        int servico_id FK
+        date data_desejada
+        boolean notificado
+    }
+    COMANDA {
+        int id PK
+        int agendamento_id FK
+        int caixa_id FK
+        decimal subtotal
+        decimal desconto
+        decimal total
+        string status
+    }
+    PAGAMENTO {
+        int id PK
+        int comanda_id FK
+        string forma
+        decimal valor
+        string status
+        datetime pago_em
+    }
+    COMISSAO {
+        int id PK
+        int comanda_id FK
+        int profissional_id FK
+        decimal valor
+        string status
+    }
+    CAIXA {
+        int id PK
+        int unidade_id FK
+        datetime abertura
+        datetime fechamento
+        decimal saldo_inicial
+        decimal saldo_final
+    }
+    PRODUTO {
+        int id PK
+        int estabelecimento_id FK
+        string nome
+        decimal custo
+        decimal preco_venda
+        int estoque_minimo
+    }
+    MOVIMENTO_ESTOQUE {
+        int id PK
+        int produto_id FK
+        int comanda_id FK
+        string tipo
+        int quantidade
+        datetime data
+    }
+    NOTIFICACAO {
+        int id PK
+        int agendamento_id FK
+        string canal
+        string mensagem
+        string status
+        datetime enviada_em
+    }
+    AVALIACAO {
+        int id PK
+        int agendamento_id FK
+        int nota
+        string comentario
+    }
+    AUDITORIA {
+        int id PK
+        int usuario_id FK
+        string entidade
+        int entidade_id
+        string acao
+        string dados_antes
+        string dados_depois
+        datetime data
+    }

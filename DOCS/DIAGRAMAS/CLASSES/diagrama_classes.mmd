@@ -1,0 +1,198 @@
+classDiagram
+    direction TB
+
+    class Estabelecimento {
+        +int id
+        +string razaoSocial
+        +string cnpj
+        +string plano
+        +boolean ativo
+    }
+    class Unidade {
+        +int id
+        +string nome
+        +string endereco
+        +string telefone
+        +time abreAs
+        +time fechaAs
+    }
+    class Usuario {
+        +int id
+        +string email
+        +string senhaHash
+        +string perfil
+        +boolean ativo
+        +autenticar()
+    }
+    class Cliente {
+        +int id
+        +string nome
+        +string telefone
+        +string email
+        +date dataNascimento
+        +string observacoes
+        +boolean consentimentoLGPD
+        +int totalNoShows
+    }
+    class Profissional {
+        +int id
+        +string nome
+        +decimal comissaoPadrao
+        +boolean ativo
+        +atendeServico(servico) boolean
+    }
+    class Especialidade {
+        +int id
+        +string nome
+    }
+    class Servico {
+        +int id
+        +string nome
+        +int duracaoMin
+        +decimal preco
+        +boolean ativo
+    }
+    class ProfissionalServico {
+        +decimal precoPersonalizado
+        +int duracaoPersonalizada
+        +decimal comissao
+    }
+    class Recurso {
+        +int id
+        +string nome
+        +string tipo
+    }
+    class Disponibilidade {
+        +int id
+        +int diaSemana
+        +time inicio
+        +time fim
+    }
+    class Bloqueio {
+        +int id
+        +datetime inicio
+        +datetime fim
+        +string motivo
+    }
+    class Agendamento {
+        +int id
+        +datetime inicio
+        +datetime fim
+        +StatusAgendamento status
+        +string origem
+        +decimal valorTotal
+        +validar()
+        +confirmar()
+        +iniciar()
+        +concluir()
+        +cancelar(motivo)
+        +remarcar(novoInicio)
+        +marcarNoShow()
+    }
+    class StatusAgendamento {
+        <<enumeration>>
+        PENDENTE
+        CONFIRMADO
+        EM_ATENDIMENTO
+        CONCLUIDO
+        CANCELADO
+        NO_SHOW
+        REMARCADO
+    }
+    class ItemAgendamento {
+        +int id
+        +decimal precoCongelado
+        +int duracaoMin
+    }
+    class ListaEspera {
+        +int id
+        +date dataDesejada
+        +boolean notificado
+    }
+    class Comanda {
+        +int id
+        +decimal subtotal
+        +decimal desconto
+        +decimal total
+        +string status
+        +fechar()
+    }
+    class Pagamento {
+        +int id
+        +string forma
+        +decimal valor
+        +string status
+        +datetime pagoEm
+        +estornar(motivo)
+    }
+    class Comissao {
+        +int id
+        +decimal valor
+        +string status
+    }
+    class Caixa {
+        +int id
+        +datetime abertura
+        +datetime fechamento
+        +decimal saldoInicial
+        +decimal saldoFinal
+    }
+    class Produto {
+        +int id
+        +string nome
+        +decimal custo
+        +decimal precoVenda
+        +int estoqueMinimo
+    }
+    class MovimentoEstoque {
+        +int id
+        +string tipo
+        +int quantidade
+        +datetime data
+    }
+    class Notificacao {
+        +int id
+        +string canal
+        +string mensagem
+        +string status
+        +datetime enviadaEm
+    }
+    class Avaliacao {
+        +int id
+        +int nota
+        +string comentario
+    }
+
+    Estabelecimento "1" --> "*" Unidade : possui
+    Estabelecimento "1" --> "*" Usuario : tem
+    Estabelecimento "1" --> "*" Cliente : atende
+    Estabelecimento "1" --> "*" Servico : oferece
+    Unidade "1" --> "*" Profissional : emprega
+    Unidade "1" --> "*" Recurso : possui
+    Unidade "1" --> "*" Caixa : opera
+    Usuario "1" --> "0..1" Profissional : e
+    Usuario "1" --> "0..1" Cliente : e
+    Profissional "*" --> "*" Especialidade : possui
+    Servico "*" --> "1" Especialidade : pertence a
+    Profissional "1" --> "*" ProfissionalServico : habilitado
+    Servico "1" --> "*" ProfissionalServico : executado por
+    Profissional "1" --> "*" Disponibilidade : trabalha
+    Profissional "1" --> "*" Bloqueio : tem
+    Cliente "1" --> "*" Agendamento : realiza
+    Profissional "1" --> "*" Agendamento : atende
+    Unidade "1" --> "*" Agendamento : sedia
+    Recurso "0..1" --> "*" Agendamento : usado em
+    Agendamento --> StatusAgendamento : status
+    Agendamento "1" --> "1..*" ItemAgendamento : contem
+    Servico "1" --> "*" ItemAgendamento : referenciado
+    Cliente "1" --> "*" ListaEspera : aguarda
+    Servico "1" --> "*" ListaEspera : deseja
+    Agendamento "1" --> "0..1" Comanda : gera
+    Comanda "1" --> "*" Pagamento : recebe
+    Comanda "*" --> "0..1" Caixa : lancada em
+    Comanda "1" --> "*" Comissao : origina
+    Profissional "1" --> "*" Comissao : recebe
+    Produto "1" --> "*" MovimentoEstoque : movimenta
+    Comanda "1" --> "*" MovimentoEstoque : consome
+    Agendamento "1" --> "*" Notificacao : dispara
+    Agendamento "1" --> "0..1" Avaliacao : recebe

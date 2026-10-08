@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant JOB as Agendador de Tarefas
+    participant AG as ServicoAgenda
+    participant DB as Banco de Dados
+    participant NT as Notificacao
+    actor C as Cliente
+    participant FID as Fidelidade/Clientes
+
+    JOB->>AG: Executa a cada X minutos
+    AG->>DB: Busca agendamentos nas proximas 24h
+    DB-->>AG: Lista
+    loop Cada agendamento
+        AG->>NT: enviarLembrete()
+        NT-->>C: Lembrete com opcao Confirmar ou Cancelar
+    end
+    C-->>NT: Responde confirmando
+    NT->>AG: confirmar(agendamento)
+    AG->>DB: status = CONFIRMADO
+
+    JOB->>AG: Verifica atendimentos vencidos
+    AG->>DB: Busca CONFIRMADO/PENDENTE com horario passado
+    loop Cada vencido sem check-in
+        AG->>DB: status = NO_SHOW
+        AG->>FID: incrementarNoShow(cliente)
+        FID->>FID: Atingiu limite? Exigir pagamento antecipado
+    end
+
+    JOB->>AG: Busca concluidos sem avaliacao
+    AG->>NT: solicitarAvaliacao()
+    NT-->>C: Link de avaliacao
+    C->>NT: Envia nota e comentario
+    NT->>DB: INSERT avaliacao

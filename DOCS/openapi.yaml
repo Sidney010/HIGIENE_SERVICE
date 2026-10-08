@@ -1,0 +1,4017 @@
+openapi: 3.0.3
+info:
+  title: API do Sistema de Agendamento — MVP
+  version: 1.0.0
+  description: Contrato do MVP (Fase 1). Datas em UTC (ISO 8601); valores monetários em BRL. Erros seguem RFC 7807
+    com o campo `codigo`. O estabelecimento é sempre derivado do token (rotas públicas usam o cabeçalho `X-Estabelecimento`).
+servers:
+- url: https://localhost:7080/api/v1
+  description: Desenvolvimento
+- url: https://{host}/api/v1
+  description: Produção
+  variables:
+    host:
+      default: api.exemplo.com
+tags:
+- name: Autenticação
+- name: Público
+- name: Sistema
+- name: Unidades
+- name: Clientes
+- name: Especialidades
+- name: Serviços
+- name: Profissionais
+- name: Agenda
+- name: Agendamentos
+- name: Comandas e pagamentos
+- name: Comissões
+- name: Relatórios
+- name: Usuários
+- name: Configurações
+paths:
+  /auth/login:
+    post:
+      tags:
+      - Autenticação
+      operationId: Autenticacao_Login
+      summary: Autentica usuário da equipe
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 400 VAL_INVALIDO; 401 AUTH_CREDENCIAIS; 429 RATE_LIMIT.'
+      x-perfis: []
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '429':
+          $ref: '#/components/responses/E429'
+        '500':
+          $ref: '#/components/responses/E500'
+  /auth/refresh:
+    post:
+      tags:
+      - Autenticação
+      operationId: Autenticacao_Refresh
+      summary: Renova o token de acesso
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 401 AUTH_TOKEN_EXPIRADO.'
+      x-perfis: []
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+  /auth/logout:
+    post:
+      tags:
+      - Autenticação
+      operationId: Autenticacao_Logout
+      summary: Encerra a sessão (revoga o refresh token)
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+  /auth/cliente/solicitar-codigo:
+    post:
+      tags:
+      - Autenticação
+      operationId: Autenticacao_SolicitarCodigo
+      summary: Envia código OTP ao telefone do cliente
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 400 VAL_INVALIDO; 429 RATE_LIMIT.'
+      x-perfis: []
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/XEstabelecimento'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitarCodigoRequest'
+      responses:
+        '202':
+          description: Aceito
+        '400':
+          $ref: '#/components/responses/E400'
+        '429':
+          $ref: '#/components/responses/E429'
+        '500':
+          $ref: '#/components/responses/E500'
+  /auth/cliente/verificar-codigo:
+    post:
+      tags:
+      - Autenticação
+      operationId: Autenticacao_VerificarCodigo
+      summary: Valida o OTP e devolve tokens com perfil Cliente
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 401 AUTH_OTP_INVALIDO; 429 RATE_LIMIT.'
+      x-perfis: []
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/XEstabelecimento'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificarCodigoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenClienteResponse'
+        '401':
+          $ref: '#/components/responses/E401'
+        '429':
+          $ref: '#/components/responses/E429'
+        '500':
+          $ref: '#/components/responses/E500'
+  /publico/estabelecimento:
+    get:
+      tags:
+      - Público
+      operationId: Publico_ObterEstabelecimento
+      summary: Dados da página pública de agendamento
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis: []
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/XEstabelecimento'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstabelecimentoPublico'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /publico/politica-privacidade:
+    get:
+      tags:
+      - Público
+      operationId: Publico_ObterPoliticaPrivacidade
+      summary: Termo de consentimento LGPD vigente
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis: []
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/XEstabelecimento'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoliticaPrivacidade'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /health:
+    get:
+      tags:
+      - Sistema
+      operationId: Sistema_Health
+      summary: Processo no ar (liveness)
+      description: '**Perfis:** Público (sem token).'
+      x-perfis: []
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          $ref: '#/components/responses/E500'
+  /health/ready:
+    get:
+      tags:
+      - Sistema
+      operationId: Sistema_HealthReady
+      summary: Banco e dependências OK (readiness)
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 503 Dependência indisponível.'
+      x-perfis: []
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          $ref: '#/components/responses/E500'
+        '503':
+          $ref: '#/components/responses/E503'
+  /webhooks/mensageria:
+    post:
+      tags:
+      - Sistema
+      operationId: Sistema_WebhookMensageria
+      summary: Recebe respostas do provedor de mensagens (assinatura HMAC no cabeçalho)
+      description: '**Perfis:** Público (sem token).
+
+
+        **Erros:** 401 Assinatura inválida.'
+      x-perfis: []
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MensageriaWebhook'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+  /unidades:
+    get:
+      tags:
+      - Unidades
+      operationId: Unidades_Listar
+      summary: Lista unidades
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: ativo
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaUnidade'
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Unidades
+      operationId: Unidades_Criar
+      summary: Cria unidade
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 409 Nome duplicado.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnidadeRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidade'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /unidades/{id}:
+    get:
+      tags:
+      - Unidades
+      operationId: Unidades_ObterPorId
+      summary: Detalha uma unidade
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidade'
+        '401':
+          $ref: '#/components/responses/E401'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Unidades
+      operationId: Unidades_Atualizar
+      summary: Atualiza unidade
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnidadeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidade'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    delete:
+      tags:
+      - Unidades
+      operationId: Unidades_Inativar
+      summary: Inativa unidade (soft delete)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 CAD_POSSUI_AGENDAMENTOS_FUTUROS.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /clientes:
+    get:
+      tags:
+      - Clientes
+      operationId: Clientes_Listar
+      summary: Lista clientes
+      description: '**Perfis:** Admin, Recepcao.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: busca
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: ativo
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaCliente'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Clientes
+      operationId: Clientes_Criar
+      summary: Cadastra cliente (inclusive autocadastro)
+      description: '**Perfis:** Admin, Recepcao, Cliente.
+
+
+        **Erros:** 400 VAL_INVALIDO; 409 CAD_TELEFONE_DUPLICADO; 422 CAD_LGPD_OBRIGATORIO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+  /clientes/{id}:
+    get:
+      tags:
+      - Clientes
+      operationId: Clientes_ObterPorId
+      summary: Detalha cliente
+      description: '**Perfis:** Admin, Recepcao, Cliente (somente o próprio).
+
+
+        **Erros:** 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Clientes
+      operationId: Clientes_Atualizar
+      summary: Atualiza cliente
+      description: '**Perfis:** Admin, Recepcao, Cliente (somente o próprio).
+
+
+        **Erros:** 400 VAL_INVALIDO; 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO; 409 CAD_TELEFONE_DUPLICADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+    delete:
+      tags:
+      - Clientes
+      operationId: Clientes_Inativar
+      summary: Inativa cliente (soft delete)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /clientes/{id}/agendamentos:
+    get:
+      tags:
+      - Clientes
+      operationId: Clientes_ListarAgendamentos
+      summary: Histórico de agendamentos do cliente
+      description: '**Perfis:** Admin, Recepcao, Cliente (somente o próprio).
+
+
+        **Erros:** 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/StatusAgendamento'
+      - name: de
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaAgendamentoResumo'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /especialidades:
+    get:
+      tags:
+      - Especialidades
+      operationId: Especialidades_Listar
+      summary: Lista especialidades
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Especialidade'
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Especialidades
+      operationId: Especialidades_Criar
+      summary: Cria especialidade
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 409 Nome duplicado.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EspecialidadeRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Especialidade'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /servicos:
+    get:
+      tags:
+      - Serviços
+      operationId: Servicos_Listar
+      summary: Lista serviços
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: especialidadeId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: ativo
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaServico'
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Serviços
+      operationId: Servicos_Criar
+      summary: Cria serviço (duração > 0, preço >= 0)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicoRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servico'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /servicos/{id}:
+    get:
+      tags:
+      - Serviços
+      operationId: Servicos_ObterPorId
+      summary: Detalha serviço
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servico'
+        '401':
+          $ref: '#/components/responses/E401'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Serviços
+      operationId: Servicos_Atualizar
+      summary: Atualiza serviço (não altera preços já congelados)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servico'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    delete:
+      tags:
+      - Serviços
+      operationId: Servicos_Inativar
+      summary: Inativa serviço (soft delete)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /profissionais:
+    get:
+      tags:
+      - Profissionais
+      operationId: Profissionais_Listar
+      summary: Lista profissionais
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: unidadeId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: servicoId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: ativo
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaProfissional'
+        '401':
+          $ref: '#/components/responses/E401'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Profissionais
+      operationId: Profissionais_Criar
+      summary: Cadastra profissional
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfissionalRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profissional'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /profissionais/{id}:
+    get:
+      tags:
+      - Profissionais
+      operationId: Profissionais_ObterPorId
+      summary: Detalha profissional
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profissional'
+        '401':
+          $ref: '#/components/responses/E401'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Profissionais
+      operationId: Profissionais_Atualizar
+      summary: Atualiza profissional
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfissionalRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profissional'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    delete:
+      tags:
+      - Profissionais
+      operationId: Profissionais_Inativar
+      summary: Inativa profissional (soft delete)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 CAD_POSSUI_AGENDAMENTOS_FUTUROS.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /profissionais/{id}/servicos:
+    get:
+      tags:
+      - Profissionais
+      operationId: Profissionais_ListarServicos
+      summary: Serviços habilitados com preço e duração efetivos
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProfissionalServico'
+        '401':
+          $ref: '#/components/responses/E401'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Profissionais
+      operationId: Profissionais_DefinirServicos
+      summary: Define os serviços que o profissional executa
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProfissionalServicoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProfissionalServico'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /profissionais/{id}/disponibilidade:
+    get:
+      tags:
+      - Profissionais
+      operationId: Profissionais_ObterDisponibilidade
+      summary: Faixas de atendimento por dia da semana
+      description: '**Perfis:** Admin, Recepcao, Profissional (somente o próprio).
+
+
+        **Erros:** 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FaixaDisponibilidade'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Profissionais
+      operationId: Profissionais_DefinirDisponibilidade
+      summary: Substitui a disponibilidade semanal
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 422 AGE_FORA_DISPONIBILIDADE (faixas sobrepostas ou fora da unidade).'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/FaixaDisponibilidade'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FaixaDisponibilidade'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+  /profissionais/{id}/bloqueios:
+    get:
+      tags:
+      - Profissionais
+      operationId: Profissionais_ListarBloqueios
+      summary: Bloqueios (folga, férias, almoço)
+      description: '**Perfis:** Admin, Recepcao, Profissional (somente o próprio).
+
+
+        **Erros:** 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: de
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bloqueio'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Profissionais
+      operationId: Profissionais_CriarBloqueio
+      summary: Cria bloqueio de agenda
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 400 VAL_INVALIDO; 409 AGE_BLOQUEIO (há agendamentos no período; devolve a lista).'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloqueioRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bloqueio'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /profissionais/{id}/bloqueios/{bloqueioId}:
+    delete:
+      tags:
+      - Profissionais
+      operationId: Profissionais_RemoverBloqueio
+      summary: Remove bloqueio
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: bloqueioId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agenda/horarios-livres:
+    get:
+      tags:
+      - Agenda
+      operationId: Agenda_HorariosLivres
+      summary: Horários livres para os serviços escolhidos
+      description: '**Perfis:** Admin, Recepcao, Profissional, Cliente.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: unidadeId
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: servicoIds
+        in: query
+        required: true
+        schema:
+          type: array
+          items:
+            type: integer
+            format: int64
+        style: form
+        explode: false
+        description: 'Lista separada por vírgula (ex.: 1,2)'
+      - name: data
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: profissionalId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HorariosLivresResponse'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agenda:
+    get:
+      tags:
+      - Agenda
+      operationId: Agenda_Consultar
+      summary: 'Visão da recepção: agendamentos e bloqueios (máx. 31 dias)'
+      description: '**Perfis:** Admin, Recepcao, Profissional (somente o próprio).
+
+
+        **Erros:** 400 VAL_INVALIDO; 403 AUTH_PERMISSAO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: unidadeId
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: de
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: profissionalId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgendaResponse'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Criar
+      summary: Cria agendamento (status PENDENTE)
+      description: '**Perfis:** Admin, Recepcao, Cliente.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO; 409 AGE_HORARIO_OCUPADO | AGE_BLOQUEIO | AGE_CLIENTE_CONFLITO
+        | IDEMPOTENCIA_CONFLITO; 422 AGE_FORA_DISPONIBILIDADE | AGE_PROFISSIONAL_NAO_HABILITADO | AGE_ANTECEDENCIA_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriarAgendamentoRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+    get:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Listar
+      summary: Lista agendamentos
+      description: '**Perfis:** Admin, Recepcao, Profissional (somente o próprio), Cliente (somente o próprio).
+
+
+        **Erros:** 400 VAL_INVALIDO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: unidadeId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: profissionalId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: clienteId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/StatusAgendamento'
+      - name: de
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaAgendamentoResumo'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}:
+    get:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_ObterPorId
+      summary: Detalha agendamento (itens, preços congelados, histórico)
+      description: '**Perfis:** Admin, Recepcao, Profissional (somente o próprio), Cliente (somente o próprio).
+
+
+        **Erros:** 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/confirmar:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Confirmar
+      summary: PENDENTE -> CONFIRMADO
+      description: '**Perfis:** Admin, Recepcao, Cliente (somente o próprio).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_TRANSICAO_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/check-in:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_CheckIn
+      summary: Registra presença do cliente
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_TRANSICAO_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/iniciar:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Iniciar
+      summary: CONFIRMADO -> EM_ATENDIMENTO
+      description: '**Perfis:** Admin, Profissional (somente o próprio).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_TRANSICAO_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/concluir:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Concluir
+      summary: EM_ATENDIMENTO -> CONCLUIDO
+      description: '**Perfis:** Admin, Profissional (somente o próprio).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_TRANSICAO_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/cancelar:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Cancelar
+      summary: Cancela; aplica multa se fora do prazo
+      description: '**Perfis:** Admin, Recepcao, Cliente (somente o próprio).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_TRANSICAO_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelarRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelarResponse'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/remarcar:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_Remarcar
+      summary: Cria novo agendamento e marca o antigo como REMARCADO
+      description: '**Perfis:** Admin, Recepcao, Cliente (somente o próprio).
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_HORARIO_OCUPADO | AGE_TRANSICAO_INVALIDA; 422 mesmas regras
+        da criação.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Cliente
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemarcarRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+  /agendamentos/{id}/no-show:
+    post:
+      tags:
+      - Agendamentos
+      operationId: Agendamentos_MarcarNoShow
+      summary: Registra falta do cliente
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 AGE_TRANSICAO_INVALIDA.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agendamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /comandas:
+    post:
+      tags:
+      - Comandas e pagamentos
+      operationId: Comandas_Criar
+      summary: Abre comanda (de um agendamento ou avulsa)
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO; 409 FIN_COMANDA_FECHADA; 422 FIN_AGENDAMENTO_NAO_INICIADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriarComandaRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comanda'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+    get:
+      tags:
+      - Comandas e pagamentos
+      operationId: Comandas_Listar
+      summary: Lista comandas
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 400 VAL_INVALIDO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/StatusComanda'
+      - name: clienteId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: de
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaComanda'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /comandas/{id}:
+    get:
+      tags:
+      - Comandas e pagamentos
+      operationId: Comandas_ObterPorId
+      summary: Detalha comanda (itens, descontos, pagamentos, saldo)
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comanda'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /comandas/{id}/descontos:
+    post:
+      tags:
+      - Comandas e pagamentos
+      operationId: Comandas_AplicarDesconto
+      summary: Aplica desconto (motivo obrigatório; Recepção só até o limite configurado)
+      description: '**Perfis:** Admin, Recepcao (somente o próprio).
+
+
+        **Erros:** 403 AUTH_PERMISSAO; 404 RECURSO_NAO_ENCONTRADO; 409 FIN_COMANDA_FECHADA; 422 FIN_DESCONTO_SEM_MOTIVO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DescontoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comanda'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+  /comandas/{id}/pagamentos:
+    post:
+      tags:
+      - Comandas e pagamentos
+      operationId: Comandas_RegistrarPagamento
+      summary: Registra pagamento (parcial ou integral)
+      description: '**Perfis:** Admin, Recepcao.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO; 409 FIN_COMANDA_FECHADA | IDEMPOTENCIA_CONFLITO;
+        422 FIN_VALOR_EXCEDE_SALDO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagamentoRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagamentoResponse'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+  /pagamentos/{id}/estorno:
+    post:
+      tags:
+      - Comandas e pagamentos
+      operationId: Comandas_EstornarPagamento
+      summary: Estorna pagamento e reverte a comissão
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 Pagamento já estornado; 422 FIN_DESCONTO_SEM_MOTIVO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstornoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pagamento'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '422':
+          $ref: '#/components/responses/E422'
+        '500':
+          $ref: '#/components/responses/E500'
+  /comissoes:
+    get:
+      tags:
+      - Comissões
+      operationId: Comissoes_Listar
+      summary: Lista comissões
+      description: '**Perfis:** Admin, Recepcao, Profissional (somente o próprio).
+
+
+        **Erros:** 400 VAL_INVALIDO; 403 AUTH_PERMISSAO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: profissionalId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: de
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/StatusComissao'
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaComissao'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /comissoes/resumo:
+    get:
+      tags:
+      - Comissões
+      operationId: Comissoes_Resumo
+      summary: Total por profissional e por serviço
+      description: '**Perfis:** Admin, Profissional (somente o próprio).
+
+
+        **Erros:** 400 VAL_INVALIDO; 403 AUTH_PERMISSAO.'
+      x-perfis:
+      - Admin
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: de
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: profissionalId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComissaoResumoItem'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /relatorios/faturamento:
+    get:
+      tags:
+      - Relatórios
+      operationId: Relatorios_Faturamento
+      summary: Faturamento por período
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: de
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: agrupar
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - dia
+          - semana
+          - mes
+      - name: unidadeId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FaturamentoItem'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /relatorios/atendimentos:
+    get:
+      tags:
+      - Relatórios
+      operationId: Relatorios_Atendimentos
+      summary: Atendimentos concluídos por profissional ou serviço
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: de
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: ate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: agruparPor
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - profissional
+          - servico
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AtendimentoRelItem'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /usuarios:
+    get:
+      tags:
+      - Usuários
+      operationId: Usuarios_Listar
+      summary: Lista usuários da equipe
+      description: '**Perfis:** Admin.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: perfil
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Perfil'
+      - name: ativo
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaUsuario'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+    post:
+      tags:
+      - Usuários
+      operationId: Usuarios_Criar
+      summary: Cria usuário
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO (senha fraca); 409 E-mail duplicado.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioCriarRequest'
+      responses:
+        '201':
+          description: Criado
+          headers:
+            Location:
+              description: URL do recurso criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /usuarios/{id}:
+    put:
+      tags:
+      - Usuários
+      operationId: Usuarios_Atualizar
+      summary: Altera o perfil do usuário
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO; 404 RECURSO_NAO_ENCONTRADO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioAtualizarRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '500':
+          $ref: '#/components/responses/E500'
+  /usuarios/{id}/senha:
+    patch:
+      tags:
+      - Usuários
+      operationId: Usuarios_AlterarSenha
+      summary: Altera senha (própria exige senha atual)
+      description: '**Perfis:** Admin, Recepcao (somente o próprio), Profissional (somente o próprio).
+
+
+        **Erros:** 400 VAL_INVALIDO; 401 AUTH_CREDENCIAIS; 403 AUTH_PERMISSAO.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      - Profissional
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SenhaRequest'
+      responses:
+        '204':
+          description: Sem conteúdo
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+  /usuarios/{id}/status:
+    patch:
+      tags:
+      - Usuários
+      operationId: Usuarios_AlterarStatus
+      summary: Ativa/inativa (não permite inativar o último Admin)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 404 RECURSO_NAO_ENCONTRADO; 409 Último administrador.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusRequest'
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '404':
+          $ref: '#/components/responses/E404'
+        '409':
+          $ref: '#/components/responses/E409'
+        '500':
+          $ref: '#/components/responses/E500'
+  /configuracoes:
+    get:
+      tags:
+      - Configurações
+      operationId: Configuracoes_Obter
+      summary: Regras vigentes do estabelecimento
+      description: '**Perfis:** Admin, Recepcao.'
+      x-perfis:
+      - Admin
+      - Recepcao
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuracoes'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+    put:
+      tags:
+      - Configurações
+      operationId: Configuracoes_Atualizar
+      summary: Atualiza regras (antecedência, multas, intervalos...)
+      description: '**Perfis:** Admin.
+
+
+        **Erros:** 400 VAL_INVALIDO.'
+      x-perfis:
+      - Admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Configuracoes'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuracoes'
+        '400':
+          $ref: '#/components/responses/E400'
+        '401':
+          $ref: '#/components/responses/E401'
+        '403':
+          $ref: '#/components/responses/E403'
+        '500':
+          $ref: '#/components/responses/E500'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Pagina:
+      name: pagina
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Tamanho:
+      name: tamanho
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    XEstabelecimento:
+      name: X-Estabelecimento
+      in: header
+      required: true
+      description: Slug do estabelecimento (rotas públicas)
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: GUID para repetir a chamada sem duplicar efeitos
+      schema:
+        type: string
+        format: uuid
+  responses:
+    E400:
+      description: Requisição inválida (VAL_INVALIDO)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E401:
+      description: Não autenticado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E403:
+      description: Sem permissão (AUTH_PERMISSAO)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E404:
+      description: Não encontrado (RECURSO_NAO_ENCONTRADO)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E409:
+      description: Conflito de estado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E422:
+      description: Regra de negócio violada
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E429:
+      description: Excesso de requisições (RATE_LIMIT)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E500:
+      description: Erro interno
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    E503:
+      description: Serviço indisponível
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+  schemas:
+    Perfil:
+      type: string
+      enum:
+      - Admin
+      - Recepcao
+      - Profissional
+      - Cliente
+    StatusAgendamento:
+      type: string
+      enum:
+      - PENDENTE
+      - CONFIRMADO
+      - EM_ATENDIMENTO
+      - CONCLUIDO
+      - CANCELADO
+      - NO_SHOW
+      - REMARCADO
+    StatusComanda:
+      type: string
+      enum:
+      - ABERTA
+      - PAGA
+      - CANCELADA
+    StatusPagamento:
+      type: string
+      enum:
+      - CONFIRMADO
+      - ESTORNADO
+    StatusComissao:
+      type: string
+      enum:
+      - PENDENTE
+      - PAGA
+      - REVERTIDA
+    FormaPagamento:
+      type: string
+      enum:
+      - PIX
+      - CARTAO_CREDITO
+      - CARTAO_DEBITO
+      - DINHEIRO
+    OrigemAgendamento:
+      type: string
+      enum:
+      - APP
+      - SITE
+      - BALCAO
+      - TELEFONE
+      - WHATSAPP
+    TipoDesconto:
+      type: string
+      enum:
+      - VALOR
+      - PERCENTUAL
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        codigo:
+          type: string
+          description: Código de erro de negócio (ex. AGE_HORARIO_OCUPADO)
+        detail:
+          type: string
+        instance:
+          type: string
+        correlationId:
+          type: string
+        erros:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Erros por campo (somente 400)
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+    LoginRequest:
+      type: object
+      required:
+      - email
+      - senha
+      properties:
+        email:
+          type: string
+          format: email
+        senha:
+          type: string
+          format: password
+    RefreshRequest:
+      type: object
+      required:
+      - refreshToken
+      properties:
+        refreshToken:
+          type: string
+    UsuarioResumo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        perfil:
+          $ref: '#/components/schemas/Perfil'
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiraEm:
+          type: string
+          format: date-time
+        usuario:
+          $ref: '#/components/schemas/UsuarioResumo'
+    SolicitarCodigoRequest:
+      type: object
+      required:
+      - telefone
+      properties:
+        telefone:
+          type: string
+    VerificarCodigoRequest:
+      type: object
+      required:
+      - telefone
+      - codigo
+      properties:
+        telefone:
+          type: string
+        codigo:
+          type: string
+    TokenClienteResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiraEm:
+          type: string
+          format: date-time
+        clienteExistente:
+          type: boolean
+    MensageriaWebhook:
+      type: object
+      additionalProperties: true
+    EstabelecimentoPublico:
+      type: object
+      properties:
+        nome:
+          type: string
+        logoUrl:
+          type: string
+        unidades:
+          type: array
+          items:
+            $ref: '#/components/schemas/Unidade'
+        servicos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Servico'
+    PoliticaPrivacidade:
+      type: object
+      properties:
+        versao:
+          type: string
+        texto:
+          type: string
+    Unidade:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        endereco:
+          type: string
+        telefone:
+          type: string
+        abreAs:
+          type: string
+          format: time
+          example: 09:00:00
+        fechaAs:
+          type: string
+          format: time
+          example: 09:00:00
+        fusoHorario:
+          type: string
+        ativo:
+          type: boolean
+    UnidadeRequest:
+      type: object
+      required:
+      - nome
+      - endereco
+      - abreAs
+      - fechaAs
+      - fusoHorario
+      properties:
+        nome:
+          type: string
+        endereco:
+          type: string
+        telefone:
+          type: string
+        abreAs:
+          type: string
+          format: time
+          example: 09:00:00
+        fechaAs:
+          type: string
+          format: time
+          example: 09:00:00
+        fusoHorario:
+          type: string
+          example: America/Sao_Paulo
+    Cliente:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        telefone:
+          type: string
+        email:
+          type: string
+        dataNascimento:
+          type: string
+          format: date
+        observacoes:
+          type: string
+          description: Dado sensível; somente Admin e Recepcao
+        consentimentoLgpd:
+          type: boolean
+        totalNoShows:
+          type: integer
+          format: int32
+        ativo:
+          type: boolean
+    ClienteRequest:
+      type: object
+      required:
+      - nome
+      - telefone
+      - consentimentoLgpd
+      properties:
+        nome:
+          type: string
+        telefone:
+          type: string
+        email:
+          type: string
+          format: email
+        dataNascimento:
+          type: string
+          format: date
+        observacoes:
+          type: string
+        consentimentoLgpd:
+          type: boolean
+    Especialidade:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+    EspecialidadeRequest:
+      type: object
+      required:
+      - nome
+      properties:
+        nome:
+          type: string
+    Servico:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        especialidadeId:
+          type: integer
+          format: int64
+        duracaoMin:
+          type: integer
+          format: int32
+        preco:
+          type: number
+          format: double
+        ativo:
+          type: boolean
+    ServicoRequest:
+      type: object
+      required:
+      - nome
+      - especialidadeId
+      - duracaoMin
+      - preco
+      properties:
+        nome:
+          type: string
+        especialidadeId:
+          type: integer
+          format: int64
+        duracaoMin:
+          type: integer
+          minimum: 1
+        preco:
+          type: number
+          minimum: 0
+    Profissional:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        unidadeId:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        comissaoPadrao:
+          type: number
+          format: double
+        especialidadeIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        ativo:
+          type: boolean
+    ProfissionalRequest:
+      type: object
+      required:
+      - unidadeId
+      - nome
+      - comissaoPadrao
+      properties:
+        unidadeId:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        comissaoPadrao:
+          type: number
+          minimum: 0
+          maximum: 100
+        especialidadeIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        usuarioId:
+          type: integer
+          format: int64
+    ProfissionalServico:
+      type: object
+      properties:
+        servicoId:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        precoEfetivo:
+          type: number
+          format: double
+        duracaoEfetivaMin:
+          type: integer
+          format: int32
+        comissaoEfetiva:
+          type: number
+          format: double
+    ProfissionalServicoRequest:
+      type: object
+      required:
+      - servicoId
+      properties:
+        servicoId:
+          type: integer
+          format: int64
+        precoPersonalizado:
+          type: number
+          format: double
+        duracaoPersonalizada:
+          type: integer
+          format: int32
+        comissao:
+          type: number
+          format: double
+    FaixaDisponibilidade:
+      type: object
+      required:
+      - diaSemana
+      - inicio
+      - fim
+      properties:
+        diaSemana:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = domingo
+        inicio:
+          type: string
+          format: time
+          example: 09:00:00
+        fim:
+          type: string
+          format: time
+          example: 09:00:00
+    Bloqueio:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        motivo:
+          type: string
+    BloqueioRequest:
+      type: object
+      required:
+      - inicio
+      - fim
+      properties:
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        motivo:
+          type: string
+    HorarioLivre:
+      type: object
+      properties:
+        profissionalId:
+          type: integer
+          format: int64
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+    HorariosLivresResponse:
+      type: object
+      properties:
+        data:
+          type: string
+          format: date
+        duracaoTotalMin:
+          type: integer
+          format: int32
+        horarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/HorarioLivre'
+    BloqueioAgenda:
+      type: object
+      properties:
+        profissionalId:
+          type: integer
+          format: int64
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        motivo:
+          type: string
+    AgendaResponse:
+      type: object
+      properties:
+        agendamentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendamentoResumo'
+        bloqueios:
+          type: array
+          items:
+            $ref: '#/components/schemas/BloqueioAgenda'
+    ClienteResumo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+    ProfissionalResumo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+    ItemAgendamento:
+      type: object
+      properties:
+        servicoId:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        duracaoMin:
+          type: integer
+          format: int32
+        precoCongelado:
+          type: number
+          format: double
+    Agendamento:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusAgendamento'
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        unidadeId:
+          type: integer
+          format: int64
+        cliente:
+          $ref: '#/components/schemas/ClienteResumo'
+        profissional:
+          $ref: '#/components/schemas/ProfissionalResumo'
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemAgendamento'
+        valorTotal:
+          type: number
+          format: double
+        origem:
+          $ref: '#/components/schemas/OrigemAgendamento'
+        criadoEm:
+          type: string
+          format: date-time
+    AgendamentoResumo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusAgendamento'
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        clienteNome:
+          type: string
+        profissionalId:
+          type: integer
+          format: int64
+        profissionalNome:
+          type: string
+        valorTotal:
+          type: number
+          format: double
+    CriarAgendamentoRequest:
+      type: object
+      required:
+      - unidadeId
+      - profissionalId
+      - inicio
+      - servicoIds
+      properties:
+        clienteId:
+          type: integer
+          format: int64
+          description: Ignorado para o perfil Cliente (usa o do token)
+        unidadeId:
+          type: integer
+          format: int64
+        profissionalId:
+          type: integer
+          format: int64
+        inicio:
+          type: string
+          format: date-time
+        servicoIds:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            format: int64
+        origem:
+          $ref: '#/components/schemas/OrigemAgendamento'
+    CancelarRequest:
+      type: object
+      properties:
+        motivo:
+          type: string
+    CancelarResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusAgendamento'
+        multaAplicada:
+          type: boolean
+        valorMulta:
+          type: number
+          format: double
+    RemarcarRequest:
+      type: object
+      required:
+      - novoInicio
+      properties:
+        novoInicio:
+          type: string
+          format: date-time
+        profissionalId:
+          type: integer
+          format: int64
+    ItemComanda:
+      type: object
+      properties:
+        servicoId:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        preco:
+          type: number
+          format: double
+    DescontoAplicado:
+      type: object
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoDesconto'
+        valor:
+          type: number
+          format: double
+        valorCalculado:
+          type: number
+          format: double
+        motivo:
+          type: string
+    Pagamento:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        forma:
+          $ref: '#/components/schemas/FormaPagamento'
+        valor:
+          type: number
+          format: double
+        status:
+          $ref: '#/components/schemas/StatusPagamento'
+        pagoEm:
+          type: string
+          format: date-time
+    Comanda:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        agendamentoId:
+          type: integer
+          format: int64
+        clienteId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusComanda'
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemComanda'
+        descontos:
+          type: array
+          items:
+            $ref: '#/components/schemas/DescontoAplicado'
+        pagamentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pagamento'
+        subtotal:
+          type: number
+          format: double
+        desconto:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+        saldo:
+          type: number
+          format: double
+    CriarComandaRequest:
+      type: object
+      description: Informe agendamentoId OU (clienteId, profissionalId, servicoIds) para comanda avulsa
+      properties:
+        agendamentoId:
+          type: integer
+          format: int64
+        clienteId:
+          type: integer
+          format: int64
+        profissionalId:
+          type: integer
+          format: int64
+        servicoIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    DescontoRequest:
+      type: object
+      required:
+      - tipo
+      - valor
+      - motivo
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoDesconto'
+        valor:
+          type: number
+          minimum: 0
+        motivo:
+          type: string
+          minLength: 3
+    PagamentoRequest:
+      type: object
+      required:
+      - forma
+      - valor
+      properties:
+        forma:
+          $ref: '#/components/schemas/FormaPagamento'
+        valor:
+          type: number
+          exclusiveMinimum: 0
+    PagamentoResponse:
+      type: object
+      properties:
+        pagamentoId:
+          type: integer
+          format: int64
+        saldoRestante:
+          type: number
+          format: double
+        statusComanda:
+          $ref: '#/components/schemas/StatusComanda'
+    EstornoRequest:
+      type: object
+      required:
+      - motivo
+      properties:
+        motivo:
+          type: string
+          minLength: 3
+    Comissao:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        comandaId:
+          type: integer
+          format: int64
+        profissionalId:
+          type: integer
+          format: int64
+        valor:
+          type: number
+          format: double
+        status:
+          $ref: '#/components/schemas/StatusComissao'
+        geradaEm:
+          type: string
+          format: date-time
+    ComissaoResumoItem:
+      type: object
+      properties:
+        profissionalId:
+          type: integer
+          format: int64
+        profissionalNome:
+          type: string
+        totalComissao:
+          type: number
+          format: double
+        quantidadeAtendimentos:
+          type: integer
+          format: int32
+        porServico:
+          type: array
+          items:
+            type: object
+            properties:
+              servicoId:
+                type: integer
+                format: int64
+              nome:
+                type: string
+              total:
+                type: number
+                format: double
+    FaturamentoItem:
+      type: object
+      properties:
+        periodo:
+          type: string
+        valor:
+          type: number
+          format: double
+        quantidadeAtendimentos:
+          type: integer
+          format: int32
+    AtendimentoRelItem:
+      type: object
+      properties:
+        chave:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        quantidade:
+          type: integer
+          format: int32
+        valor:
+          type: number
+          format: double
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        perfil:
+          $ref: '#/components/schemas/Perfil'
+        ativo:
+          type: boolean
+    UsuarioCriarRequest:
+      type: object
+      required:
+      - email
+      - senhaInicial
+      - perfil
+      properties:
+        email:
+          type: string
+          format: email
+        senhaInicial:
+          type: string
+          format: password
+          minLength: 8
+        perfil:
+          type: string
+          enum:
+          - Admin
+          - Recepcao
+          - Profissional
+    UsuarioAtualizarRequest:
+      type: object
+      required:
+      - perfil
+      properties:
+        perfil:
+          $ref: '#/components/schemas/Perfil'
+    SenhaRequest:
+      type: object
+      required:
+      - novaSenha
+      properties:
+        senhaAtual:
+          type: string
+          format: password
+        novaSenha:
+          type: string
+          format: password
+          minLength: 8
+    StatusRequest:
+      type: object
+      required:
+      - ativo
+      properties:
+        ativo:
+          type: boolean
+    Configuracoes:
+      type: object
+      properties:
+        antecedenciaMinimaMinutos:
+          type: integer
+          format: int32
+        antecedenciaMaximaDias:
+          type: integer
+          format: int32
+        prazoCancelamentoHoras:
+          type: integer
+          format: int32
+        intervaloHigienizacaoMinutos:
+          type: integer
+          format: int32
+        multaCancelamentoTardioPercentual:
+          type: number
+          format: double
+        limiteDescontoRecepcaoPercentual:
+          type: number
+          format: double
+        canaisNotificacao:
+          type: array
+          items:
+            type: string
+            enum:
+            - WHATSAPP
+            - SMS
+            - EMAIL
+        lembretesHorasAntes:
+          type: array
+          items:
+            type: integer
+            format: int32
+    PaginaUnidade:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Unidade'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaCliente:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cliente'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaAgendamentoResumo:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendamentoResumo'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaServico:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Servico'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaProfissional:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Profissional'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaComanda:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comanda'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaComissao:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comissao'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
+    PaginaUsuario:
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Usuario'
+        pagina:
+          type: integer
+        tamanho:
+          type: integer
+        totalItens:
+          type: integer
+        totalPaginas:
+          type: integer
